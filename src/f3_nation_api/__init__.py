@@ -1,5 +1,6 @@
 """Typed async client for the F3 Nation API."""
 
+from .client import F3NationClient, F3NationClientConfig
 from .errors import (
     F3NationAmbiguousMatchError,
     F3NationAuthenticationError,
@@ -17,6 +18,8 @@ __all__ = [
     "AttendanceType",
     "AttendanceUser",
     "EventInstance",
+    "F3NationClient",
+    "F3NationClientConfig",
     "F3NationAmbiguousMatchError",
     "F3NationAuthenticationError",
     "F3NationError",
