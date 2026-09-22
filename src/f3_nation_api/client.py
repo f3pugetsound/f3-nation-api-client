@@ -2,16 +2,20 @@
 
 import asyncio
 from dataclasses import dataclass
+from datetime import date
 from typing import Any, Self
 
 import httpx
 
 from .errors import (
+    F3NationAmbiguousMatchError,
     F3NationAuthenticationError,
+    F3NationNotFoundError,
     F3NationRateLimitError,
     F3NationResponseError,
     F3NationServerError,
 )
+from .models import AO, AttendanceRecord, EventInstance
 
 
 @dataclass(frozen=True, slots=True)
@@ -119,6 +123,97 @@ class F3NationClient:
         if not isinstance(payload, dict):
             raise F3NationResponseError("F3 Nation API response must be a JSON object")
         return payload
+
+    async def search_aos(self, search_term: str) -> tuple[AO, ...]:
+        """Return active AOs matching a name search term."""
+        term = search_term.strip()
+        if len(term) < 2:
+            raise ValueError("search_term must contain at least two characters")
+        payload = await self.get_json("/v1/org-chart/aos", params={"searchTerm": term})
+        raw_aos = payload.get("aos")
+        if not isinstance(raw_aos, list):
+            raise F3NationResponseError("F3 Nation AO response must contain an aos array")
+        return tuple(AO.from_dict(item) for item in raw_aos)
+
+    async def find_ao_exact(self, name: str, *, region_id: int) -> AO:
+        """Find exactly one AO by normalized name within a region."""
+        normalized_name = name.strip().casefold()
+        matches = tuple(
+            ao
+            for ao in await self.search_aos(name)
+            if ao.region_id == region_id
+            and ao.name is not None
+            and ao.name.strip().casefold() == normalized_name
+        )
+        if not matches:
+            raise F3NationNotFoundError(
+                f"No AO named {name.strip()!r} exists in region {region_id}"
+            )
+        if len(matches) > 1:
+            raise F3NationAmbiguousMatchError(
+                f"Multiple AOs named {name.strip()!r} exist in region {region_id}"
+            )
+        return matches[0]
+
+    async def list_event_instances(
+        self,
+        *,
+        ao_id: int,
+        start_date: date,
+        end_date: date,
+        page_size: int = 100,
+    ) -> tuple[EventInstance, ...]:
+        """Return every active AO event instance in an inclusive date range."""
+        if start_date > end_date:
+            raise ValueError("start_date must not be after end_date")
+        if page_size <= 0:
+            raise ValueError("page_size must be positive")
+
+        events: list[EventInstance] = []
+        page_index = 0
+        while True:
+            payload = await self.get_json(
+                "/v1/event-instance",
+                params={
+                    "aoOrgId": ao_id,
+                    "startDate": start_date.isoformat(),
+                    "startDateTo": end_date.isoformat(),
+                    "pageIndex": page_index,
+                    "pageSize": page_size,
+                },
+            )
+            raw_events = payload.get("eventInstances")
+            total_count = payload.get("totalCount")
+            if not isinstance(raw_events, list):
+                raise F3NationResponseError(
+                    "F3 Nation event response must contain an eventInstances array"
+                )
+            if not isinstance(total_count, int) or isinstance(total_count, bool) or total_count < 0:
+                raise F3NationResponseError(
+                    "F3 Nation event response must contain a non-negative totalCount"
+                )
+            page = tuple(EventInstance.from_dict(item) for item in raw_events)
+            events.extend(page)
+            if len(events) >= total_count:
+                return tuple(events)
+            if not page:
+                raise F3NationResponseError("F3 Nation event pagination ended before totalCount")
+            page_index += 1
+
+    async def get_attendance(
+        self, *, event_instance_id: int, planned: bool = True
+    ) -> tuple[AttendanceRecord, ...]:
+        """Return planned or actual attendance for one event instance."""
+        payload = await self.get_json(
+            f"/v1/attendance/event-instance/{event_instance_id}",
+            params={"isPlanned": planned},
+        )
+        raw_attendance = payload.get("attendance")
+        if not isinstance(raw_attendance, list):
+            raise F3NationResponseError(
+                "F3 Nation attendance response must contain an attendance array"
+            )
+        return tuple(AttendanceRecord.from_dict(item) for item in raw_attendance)
 
     def _retry_delay(self, attempt: int, response: httpx.Response | None) -> float:
         if response is not None:
