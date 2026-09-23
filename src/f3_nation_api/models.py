@@ -34,6 +34,13 @@ def _optional_string(data: dict[str, Any], key: str, field: str) -> str | None:
     return value
 
 
+def _optional_integer(data: dict[str, Any], key: str, field: str) -> int | None:
+    value = data.get(key)
+    if value is not None and (not isinstance(value, int) or isinstance(value, bool)):
+        raise F3NationResponseError(f"{field} must be an integer or null")
+    return value
+
+
 @dataclass(frozen=True, slots=True)
 class AO:
     id: int
@@ -53,12 +60,38 @@ class AO:
 
 
 @dataclass(frozen=True, slots=True)
+class RegionAO:
+    id: int
+    region_id: int
+    name: str | None
+    is_active: bool
+    slack_channel_id: str | None
+
+    @classmethod
+    def from_dict(cls, value: object) -> "RegionAO":
+        data = _mapping(value, "RegionAO")
+        meta = _mapping(data.get("meta", {}), "RegionAO.meta")
+        return cls(
+            id=_integer(data, "id", "RegionAO.id"),
+            region_id=_integer(data, "parentId", "RegionAO.parentId"),
+            name=_optional_string(data, "name", "RegionAO.name"),
+            is_active=_boolean(data, "isActive", "RegionAO.isActive"),
+            slack_channel_id=_optional_string(
+                meta, "slack_channel_id", "RegionAO.meta.slack_channel_id"
+            ),
+        )
+
+
+@dataclass(frozen=True, slots=True)
 class EventInstance:
     id: int
     name: str | None
     org_id: int
     start_date: date
     is_active: bool
+    ao_name: str | None = None
+    pax_count: int | None = None
+    fng_count: int | None = None
 
     @classmethod
     def from_dict(cls, value: object) -> "EventInstance":
@@ -76,6 +109,9 @@ class EventInstance:
             org_id=_integer(data, "orgId", "EventInstance.orgId"),
             start_date=start_date,
             is_active=_boolean(data, "isActive", "EventInstance.isActive"),
+            ao_name=_optional_string(data, "aoName", "EventInstance.aoName"),
+            pax_count=_optional_integer(data, "paxCount", "EventInstance.paxCount"),
+            fng_count=_optional_integer(data, "fngCount", "EventInstance.fngCount"),
         )
 
 

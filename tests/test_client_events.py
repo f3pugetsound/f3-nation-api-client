@@ -12,7 +12,10 @@ def event_payload(identifier: int, start_date: str) -> dict[str, object]:
         "name": f"Event {identifier}",
         "isActive": True,
         "orgId": 42,
+        "aoName": "The AO",
         "startDate": start_date,
+        "paxCount": 8,
+        "fngCount": 1,
     }
 
 
@@ -41,6 +44,9 @@ async def test_list_event_instances_fetches_every_page_with_date_filters() -> No
         )
 
     assert [event.id for event in events] == [1, 2, 3]
+    assert events[0].ao_name == "The AO"
+    assert events[0].pax_count == 8
+    assert events[0].fng_count == 1
     assert len(requests) == 2
     assert requests[0].url.path == "/v1/event-instance"
     assert requests[0].url.params["aoOrgId"] == "42"
@@ -65,3 +71,46 @@ async def test_list_event_instances_accepts_empty_result() -> None:
         )
 
     assert events == ()
+
+
+@pytest.mark.asyncio
+async def test_list_event_instances_can_select_a_region() -> None:
+    requests: list[httpx.Request] = []
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        requests.append(request)
+        return httpx.Response(200, json={"eventInstances": [], "totalCount": 0})
+
+    async with F3NationClient(
+        F3NationClientConfig(api_key="key", client_name="test"),
+        transport=httpx.MockTransport(handler),
+    ) as client:
+        await client.list_event_instances(
+            region_id=38237,
+            start_date=date(2026, 9, 1),
+            end_date=date(2026, 9, 30),
+        )
+
+    assert requests[0].url.params["regionOrgId"] == "38237"
+    assert "aoOrgId" not in requests[0].url.params
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize(
+    ("ao_id", "region_id"),
+    [(None, None), (42, 38237)],
+)
+async def test_list_event_instances_requires_exactly_one_scope(
+    ao_id: int | None, region_id: int | None
+) -> None:
+    async with F3NationClient(
+        F3NationClientConfig(api_key="key", client_name="test"),
+        transport=httpx.MockTransport(lambda _: httpx.Response(500)),
+    ) as client:
+        with pytest.raises(ValueError, match="exactly one"):
+            await client.list_event_instances(
+                ao_id=ao_id,
+                region_id=region_id,
+                start_date=date(2026, 9, 1),
+                end_date=date(2026, 9, 30),
+            )

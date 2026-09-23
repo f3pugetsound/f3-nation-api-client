@@ -10,7 +10,14 @@ from .errors import (
     F3NationResponseError,
     F3NationServerError,
 )
-from .models import AO, AttendanceRecord, AttendanceType, AttendanceUser, EventInstance
+from .models import (
+    AO,
+    AttendanceRecord,
+    AttendanceType,
+    AttendanceUser,
+    EventInstance,
+    RegionAO,
+)
 
 __all__ = [
     "AO",
@@ -18,6 +25,7 @@ __all__ = [
     "AttendanceType",
     "AttendanceUser",
     "EventInstance",
+    "RegionAO",
     "F3NationClient",
     "F3NationClientConfig",
     "F3NationAmbiguousMatchError",

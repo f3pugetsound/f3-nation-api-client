@@ -15,7 +15,7 @@ from .errors import (
     F3NationResponseError,
     F3NationServerError,
 )
-from .models import AO, AttendanceRecord, EventInstance
+from .models import AO, AttendanceRecord, EventInstance, RegionAO
 
 
 @dataclass(frozen=True, slots=True)
@@ -155,27 +155,76 @@ class F3NationClient:
             )
         return matches[0]
 
+    async def list_region_aos(
+        self, *, region_id: int, page_size: int = 100
+    ) -> tuple[RegionAO, ...]:
+        """Return every active AO directly belonging to a region."""
+        if region_id <= 0:
+            raise ValueError("region_id must be positive")
+        if page_size <= 0:
+            raise ValueError("page_size must be positive")
+
+        aos: list[RegionAO] = []
+        page_index = 0
+        while True:
+            payload = await self.get_json(
+                "/v1/org",
+                params={
+                    "orgTypes[0]": "ao",
+                    "parentOrgIds[0]": region_id,
+                    "statuses[0]": "active",
+                    "pageIndex": page_index,
+                    "pageSize": page_size,
+                },
+            )
+            raw_aos = payload.get("orgs")
+            total_count = payload.get("total")
+            if not isinstance(raw_aos, list):
+                raise F3NationResponseError(
+                    "F3 Nation organization response must contain an orgs array"
+                )
+            if not isinstance(total_count, int) or isinstance(total_count, bool) or total_count < 0:
+                raise F3NationResponseError(
+                    "F3 Nation organization response must contain a non-negative total"
+                )
+            page = tuple(RegionAO.from_dict(item) for item in raw_aos)
+            aos.extend(page)
+            if len(aos) >= total_count:
+                return tuple(aos)
+            if not page:
+                raise F3NationResponseError("F3 Nation organization pagination ended before total")
+            page_index += 1
+
     async def list_event_instances(
         self,
         *,
-        ao_id: int,
         start_date: date,
         end_date: date,
+        ao_id: int | None = None,
+        region_id: int | None = None,
         page_size: int = 100,
     ) -> tuple[EventInstance, ...]:
-        """Return every active AO event instance in an inclusive date range."""
+        """Return every event instance for exactly one AO or region and date range."""
+        if (ao_id is None) == (region_id is None):
+            raise ValueError("exactly one of ao_id or region_id is required")
         if start_date > end_date:
             raise ValueError("start_date must not be after end_date")
         if page_size <= 0:
             raise ValueError("page_size must be positive")
 
+        scope: dict[str, str | int | bool]
+        if ao_id is not None:
+            scope = {"aoOrgId": ao_id}
+        else:
+            assert region_id is not None
+            scope = {"regionOrgId": region_id}
         events: list[EventInstance] = []
         page_index = 0
         while True:
             payload = await self.get_json(
                 "/v1/event-instance",
                 params={
-                    "aoOrgId": ao_id,
+                    **scope,
                     "startDate": start_date.isoformat(),
                     "startDateTo": end_date.isoformat(),
                     "pageIndex": page_index,

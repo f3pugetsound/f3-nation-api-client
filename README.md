@@ -9,7 +9,7 @@ Pin a tagged release:
 ```toml
 [project]
 dependencies = [
-  "f3-nation-api-client @ git+https://github.com/f3pugetsound/f3-nation-api-client.git@v0.1.0",
+  "f3-nation-api-client @ git+https://github.com/f3pugetsound/f3-nation-api-client.git@v0.2.0",
 ]
 ```
 
@@ -27,8 +27,9 @@ config = F3NationClientConfig(
 
 async with F3NationClient(config) as client:
     ao = await client.find_ao_exact("Hiawatha", region_id=123)
+    regional_aos = await client.list_region_aos(region_id=123)
     events = await client.list_event_instances(
-        ao_id=ao.id,
+        region_id=123,
         start_date=date(2026, 1, 1),
         end_date=date(2026, 4, 30),
     )
