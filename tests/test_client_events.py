@@ -16,6 +16,8 @@ def event_payload(identifier: int, start_date: str) -> dict[str, object]:
         "startDate": start_date,
         "paxCount": 8,
         "fngCount": 1,
+        "locationName": "Needle Park",
+        "backblastTs": 1_795_000_001.25,
     }
 
 
@@ -47,12 +49,34 @@ async def test_list_event_instances_fetches_every_page_with_date_filters() -> No
     assert events[0].ao_name == "The AO"
     assert events[0].pax_count == 8
     assert events[0].fng_count == 1
+    assert events[0].location_name == "Needle Park"
+    assert events[0].backblast_ts == 1_795_000_001.25
     assert len(requests) == 2
     assert requests[0].url.path == "/v1/event-instance"
     assert requests[0].url.params["aoOrgId"] == "42"
     assert requests[0].url.params["startDate"] == "2026-09-01"
     assert requests[0].url.params["startDateTo"] == "2026-09-30"
     assert requests[1].url.params["pageIndex"] == "1"
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("field", ["locationName", "backblastTs"])
+async def test_list_event_instances_rejects_invalid_evidence_fields(field: str) -> None:
+    payload = event_payload(1, "2026-09-01")
+    payload[field] = True
+    transport = httpx.MockTransport(
+        lambda _: httpx.Response(200, json={"eventInstances": [payload], "totalCount": 1})
+    )
+
+    async with F3NationClient(
+        F3NationClientConfig(api_key="key", client_name="test"), transport=transport
+    ) as client:
+        with pytest.raises(Exception, match=field):
+            await client.list_event_instances(
+                ao_id=42,
+                start_date=date(2026, 9, 1),
+                end_date=date(2026, 9, 30),
+            )
 
 
 @pytest.mark.asyncio

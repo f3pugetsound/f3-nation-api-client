@@ -33,6 +33,8 @@ async with F3NationClient(config) as client:
         start_date=date(2026, 1, 1),
         end_date=date(2026, 4, 30),
     )
+    # Event instances expose submitted PAX/FNG counts, location names, and
+    # Slack backblast timestamps when the API provides them.
     attendance = await client.get_attendance(
         event_instance_id=events[0].id,
         planned=False,
