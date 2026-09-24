@@ -41,6 +41,15 @@ def _optional_integer(data: dict[str, Any], key: str, field: str) -> int | None:
     return value
 
 
+def _optional_number(data: dict[str, Any], key: str, field: str) -> float | None:
+    value = data.get(key)
+    if value is None:
+        return None
+    if not isinstance(value, (int, float)) or isinstance(value, bool):
+        raise F3NationResponseError(f"{field} must be a number or null")
+    return float(value)
+
+
 @dataclass(frozen=True, slots=True)
 class AO:
     id: int
@@ -92,6 +101,8 @@ class EventInstance:
     ao_name: str | None = None
     pax_count: int | None = None
     fng_count: int | None = None
+    location_name: str | None = None
+    backblast_ts: float | None = None
 
     @classmethod
     def from_dict(cls, value: object) -> "EventInstance":
@@ -112,6 +123,8 @@ class EventInstance:
             ao_name=_optional_string(data, "aoName", "EventInstance.aoName"),
             pax_count=_optional_integer(data, "paxCount", "EventInstance.paxCount"),
             fng_count=_optional_integer(data, "fngCount", "EventInstance.fngCount"),
+            location_name=_optional_string(data, "locationName", "EventInstance.locationName"),
+            backblast_ts=_optional_number(data, "backblastTs", "EventInstance.backblastTs"),
         )
 
 
