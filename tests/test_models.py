@@ -3,7 +3,7 @@ from datetime import date
 import pytest
 
 from f3_nation_api.errors import F3NationResponseError
-from f3_nation_api.models import AO, AttendanceRecord, EventInstance
+from f3_nation_api.models import AO, AttendanceRecord, EventInstance, Location
 
 
 def test_ao_parses_documented_payload() -> None:
@@ -32,13 +32,31 @@ def test_event_instance_parses_relevant_fields() -> None:
             "name": "Hiawatha - Bootcamp",
             "isActive": True,
             "orgId": 42,
+            "locationId": 99,
             "startDate": "2026-09-20",
         }
     )
 
     assert event.id == 101
     assert event.org_id == 42
+    assert event.location_id == 99
     assert event.start_date == date(2026, 9, 20)
+
+
+def test_location_parses_documented_payload() -> None:
+    location = Location.from_dict(
+        {
+            "id": 99,
+            "locationName": "OTB-The Watchtower",
+            "regionId": 7,
+            "isActive": True,
+        }
+    )
+
+    assert location.id == 99
+    assert location.name == "OTB-The Watchtower"
+    assert location.region_id == 7
+    assert location.is_active is True
 
 
 def test_attendance_record_parses_nested_user_and_types() -> None:

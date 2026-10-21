@@ -15,7 +15,7 @@ from .errors import (
     F3NationResponseError,
     F3NationServerError,
 )
-from .models import AO, AttendanceRecord, EventInstance, RegionAO
+from .models import AO, AttendanceRecord, EventInstance, Location, RegionAO
 
 
 @dataclass(frozen=True, slots=True)
@@ -193,6 +193,51 @@ class F3NationClient:
                 return tuple(aos)
             if not page:
                 raise F3NationResponseError("F3 Nation organization pagination ended before total")
+            page_index += 1
+
+    async def list_region_locations(
+        self, *, region_id: int, page_size: int = 100
+    ) -> tuple[Location, ...]:
+        """Return every active workout location belonging to a region."""
+        if region_id <= 0:
+            raise ValueError("region_id must be positive")
+        if page_size <= 0:
+            raise ValueError("page_size must be positive")
+
+        locations: list[Location] = []
+        page_index = 0
+        while True:
+            payload = await self.get_json(
+                "/v1/location",
+                params={
+                    "regionIds[0]": region_id,
+                    "statuses[0]": "active",
+                    "pageIndex": page_index,
+                    "pageSize": page_size,
+                },
+            )
+            raw_locations = payload.get("locations")
+            total_count = payload.get("totalCount")
+            if not isinstance(raw_locations, list):
+                raise F3NationResponseError(
+                    "F3 Nation location response must contain a locations array"
+                )
+            if (
+                not isinstance(total_count, int)
+                or isinstance(total_count, bool)
+                or total_count < 0
+            ):
+                raise F3NationResponseError(
+                    "F3 Nation location response must contain a non-negative totalCount"
+                )
+            page = tuple(Location.from_dict(item) for item in raw_locations)
+            locations.extend(page)
+            if len(locations) >= total_count:
+                return tuple(locations)
+            if not page:
+                raise F3NationResponseError(
+                    "F3 Nation location pagination ended before totalCount"
+                )
             page_index += 1
 
     async def list_event_instances(

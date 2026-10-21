@@ -92,6 +92,27 @@ class RegionAO:
 
 
 @dataclass(frozen=True, slots=True)
+class Location:
+    id: int
+    name: str
+    region_id: int | None
+    is_active: bool
+
+    @classmethod
+    def from_dict(cls, value: object) -> "Location":
+        data = _mapping(value, "Location")
+        name = data.get("locationName")
+        if not isinstance(name, str):
+            raise F3NationResponseError("Location.locationName must be a string")
+        return cls(
+            id=_integer(data, "id", "Location.id"),
+            name=name,
+            region_id=_optional_integer(data, "regionId", "Location.regionId"),
+            is_active=_boolean(data, "isActive", "Location.isActive"),
+        )
+
+
+@dataclass(frozen=True, slots=True)
 class EventInstance:
     id: int
     name: str | None
@@ -103,6 +124,7 @@ class EventInstance:
     fng_count: int | None = None
     location_name: str | None = None
     backblast_ts: float | None = None
+    location_id: int | None = None
 
     @classmethod
     def from_dict(cls, value: object) -> "EventInstance":
@@ -123,6 +145,7 @@ class EventInstance:
             ao_name=_optional_string(data, "aoName", "EventInstance.aoName"),
             pax_count=_optional_integer(data, "paxCount", "EventInstance.paxCount"),
             fng_count=_optional_integer(data, "fngCount", "EventInstance.fngCount"),
+            location_id=_optional_integer(data, "locationId", "EventInstance.locationId"),
             location_name=_optional_string(data, "locationName", "EventInstance.locationName"),
             backblast_ts=_optional_number(data, "backblastTs", "EventInstance.backblastTs"),
         )

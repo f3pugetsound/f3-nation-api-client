@@ -16,6 +16,7 @@ from .models import (
     AttendanceType,
     AttendanceUser,
     EventInstance,
+    Location,
     RegionAO,
 )
 
@@ -25,6 +26,7 @@ __all__ = [
     "AttendanceType",
     "AttendanceUser",
     "EventInstance",
+    "Location",
     "RegionAO",
     "F3NationClient",
     "F3NationClientConfig",
